@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BAC Calculator">
     <title>BAC Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -93,6 +94,18 @@
             margin-bottom: 20px;
         }
         .bac-value { font-size: 48px; font-weight: 700; margin-bottom: 10px; }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .chart-container h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            text-align: center;
+        }
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -134,6 +147,21 @@
         }
         .warning.show { display: block; }
         .warning h3 { color: #c62828; margin-bottom: 10px; font-size: 16px; }
+        .legal-line {
+            position: relative;
+            height: 0;
+        }
+        .legal-line::after {
+            content: '0.08% Legal Limit';
+            position: absolute;
+            right: 10px;
+            top: -10px;
+            font-size: 11px;
+            color: #f44336;
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
         @media (max-width: 480px) {
             .info-grid { grid-template-columns: 1fr; }
         }
@@ -211,6 +239,11 @@
                 <div>Current Blood Alcohol Content</div>
             </div>
 
+            <div class="chart-container">
+                <h3>BAC Over Time</h3>
+                <canvas id="bacChart"></canvas>
+            </div>
+
             <div class="info-grid">
                 <div class="info-card">
                     <div class="info-value" id="peakBac">0.00%</div>
@@ -246,6 +279,7 @@
         (function() {
             'use strict';
             
+            var bacChart = null;
             var presetEl = document.getElementById('preset');
             var alcoholEl = document.getElementById('alcohol');
             var volumeEl = document.getElementById('volume');
@@ -265,6 +299,119 @@
                 };
             }
             
+            function createChart(timePoints, bacValues, peakTime, currentTime) {
+                var ctx = document.getElementById('bacChart');
+                if (!ctx) return;
+                
+                ctx = ctx.getContext('2d');
+                
+                if (bacChart) {
+                    bacChart.destroy();
+                }
+                
+                bacChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timePoints,
+                        datasets: [{
+                            label: 'BAC (%)',
+                            data: bacValues,
+                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                            borderColor: 'rgba(192, 57, 43, 1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: function(context) {
+                                var index = context.dataIndex;
+                                return Math.abs(timePoints[index] - currentTime) < 0.15 ? 6 : 2;
+                            },
+                            pointBackgroundColor: function(context) {
+                                var index = context.dataIndex;
+                                return Math.abs(timePoints[index] - currentTime) < 0.15 ? '#2196F3' : 'rgba(192, 57, 43, 1)';
+                            },
+                            pointBorderColor: function(context) {
+                                var index = context.dataIndex;
+                                return Math.abs(timePoints[index] - currentTime) < 0.15 ? '#2196F3' : 'rgba(192, 57, 43, 1)';
+                            },
+                            pointBorderWidth: function(context) {
+                                var index = context.dataIndex;
+                                return Math.abs(timePoints[index] - currentTime) < 0.15 ? 3 : 1;
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'BAC: ' + context.parsed.y.toFixed(3) + '%';
+                                    },
+                                    title: function(context) {
+                                        return 'Time: ' + context[0].label + ' hours';
+                                    }
+                                }
+                            },
+                            annotation: {
+                                annotations: {
+                                    line1: {
+                                        type: 'line',
+                                        yMin: 0.08,
+                                        yMax: 0.08,
+                                        borderColor: 'rgba(244, 67, 54, 0.8)',
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        label: {
+                                            content: 'Legal Limit (0.08%)',
+                                            enabled: true,
+                                            position: 'end'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time Since Start of Drinking (hours)',
+                                    font: {
+                                        size: 13,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    maxTicksLimit: 10
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Blood Alcohol Content (%)',
+                                    font: {
+                                        size: 13,
+                                        weight: 'bold'
+                                    }
+                                },
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(2) + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
             // Calculate handler
             if (calcBtn) {
                 calcBtn.onclick = function() {
@@ -280,13 +427,45 @@
                             return false;
                         }
                         
-                        // Widmark formula
+                        // Widmark formula constants
                         var r = gender === 'male' ? 0.68 : 0.55;
-                        var alcoholGrams = (alcohol / 100) * volume * 0.789;
+                        var alcoholDensity = 0.789;
+                        var eliminationRate = 0.015; // % per hour
+                        
+                        // Calculate grams of alcohol
+                        var alcoholGrams = (alcohol / 100) * volume * alcoholDensity;
+                        
+                        // Calculate peak BAC
                         var peakBAC = (alcoholGrams / (r * weight * 1000)) * 100;
-                        var currentBAC = Math.max(0, peakBAC - (0.015 * drinkTime));
+                        
+                        // Current BAC (right now, after drinking time)
+                        var currentBAC = Math.max(0, peakBAC - (eliminationRate * drinkTime));
+                        
+                        // Standard drinks
                         var standardDrinks = alcoholGrams / 14;
-                        var hoursToSober = currentBAC / 0.015;
+                        
+                        // Time until sober
+                        var hoursToSober = currentBAC / eliminationRate;
+                        
+                        // Generate chart data
+                        var timePoints = [];
+                        var bacValues = [];
+                        var maxTime = Math.max(12, drinkTime + hoursToSober + 2);
+                        
+                        for (var t = 0; t <= maxTime; t += 0.25) {
+                            timePoints.push(t.toFixed(2));
+                            
+                            var bac;
+                            if (t < drinkTime) {
+                                // During drinking - linear absorption
+                                bac = (peakBAC * (t / drinkTime)) - (eliminationRate * t);
+                            } else {
+                                // After drinking - elimination only
+                                bac = peakBAC - (eliminationRate * t);
+                            }
+                            
+                            bacValues.push(Math.max(0, bac));
+                        }
                         
                         // Update display
                         document.getElementById('bacValue').textContent = currentBAC.toFixed(3) + '%';
@@ -297,15 +476,15 @@
                         
                         // Effects
                         var effects = 'No noticeable effects';
-                        if (currentBAC >= 0.40) effects = 'MEDICAL EMERGENCY: high risk of death';
-                        else if (currentBAC >= 0.30) effects = 'Severe intoxication, risk of passing out';
-                        else if (currentBAC >= 0.20) effects = 'Severe impairment, confusion, dizziness';
-                        else if (currentBAC >= 0.15) effects = 'Major impairment of motor skills';
-                        else if (currentBAC >= 0.10) effects = 'Significant impairment of coordination';
-                        else if (currentBAC >= 0.08) effects = 'Impairment of balance, speech, vision';
-                        else if (currentBAC >= 0.06) effects = 'Minor impairment of reasoning';
-                        else if (currentBAC >= 0.03) effects = 'Feeling of warmth and relaxation';
-                        else if (currentBAC >= 0.01) effects = 'Mild effects: mood elevation';
+                        if (currentBAC >= 0.40) effects = 'MEDICAL EMERGENCY: Extremely high risk of death from alcohol poisoning. CALL 911.';
+                        else if (currentBAC >= 0.30) effects = 'Severe intoxication. High risk of passing out. Little comprehension of surroundings.';
+                        else if (currentBAC >= 0.20) effects = 'Severe impairment. Confusion, dizziness, may need assistance walking.';
+                        else if (currentBAC >= 0.15) effects = 'Major impairment of balance and motor skills. Vomiting may occur.';
+                        else if (currentBAC >= 0.10) effects = 'Significant impairment of motor coordination and judgment. DO NOT DRIVE.';
+                        else if (currentBAC >= 0.08) effects = 'Mild impairment of balance, speech, vision, and reaction time. Legally impaired.';
+                        else if (currentBAC >= 0.06) effects = 'Minor impairment of reasoning and memory. Lowered alertness.';
+                        else if (currentBAC >= 0.03) effects = 'Feeling of warmth and relaxation. Minor loss of inhibition.';
+                        else if (currentBAC >= 0.01) effects = 'Mild effects: Slight mood elevation and relaxation.';
                         
                         document.getElementById('effects').textContent = effects;
                         
@@ -316,6 +495,9 @@
                         } else {
                             warningEl.className = 'warning';
                         }
+                        
+                        // Create chart
+                        createChart(timePoints, bacValues, drinkTime, drinkTime);
                         
                         // Show results
                         var resultsEl = document.getElementById('results');
