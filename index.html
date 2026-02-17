@@ -776,6 +776,17 @@
                         labels: timePoints,
                         datasets: datasets
                     },
+                    plugins: [{
+                        id: 'canvasBg',
+                        beforeDraw: function(chart) {
+                            var ctx2 = chart.canvas.getContext('2d');
+                            ctx2.save();
+                            ctx2.globalCompositeOperation = 'destination-over';
+                            ctx2.fillStyle = '#12121f';
+                            ctx2.fillRect(0, 0, chart.canvas.width, chart.canvas.height);
+                            ctx2.restore();
+                        }
+                    }],
                     options: {
                         responsive: true,
                         maintainAspectRatio: true,
@@ -1203,6 +1214,30 @@
                 }
             }
 
+            // ── Capture chart as base64 PNG ────────────────────────────
+            function getChartImage() {
+                var canvas = document.getElementById('bacChart');
+                if (!canvas || !bacChart) return null;
+                try { return canvas.toDataURL('image/png'); }
+                catch(e) { return null; }
+            }
+
+            // ── Build session snapshot object ──────────────────────────
+            function buildSessionSnapshot() {
+                return {
+                    savedAt: Date.now(),
+                    mode: planningMode ? 'plan' : 'live',
+                    weight: document.getElementById('weight').value,
+                    gender: document.getElementById('gender').value,
+                    drinks: drinks.slice(),
+                    peakBac: document.getElementById('peakBac') ? document.getElementById('peakBac').textContent : '—',
+                    soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
+                    totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
+                    effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—',
+                    chartImage: getChartImage()
+                };
+            }
+
             // ── Save current session ───────────────────────────────────
             var saveBtn = document.getElementById('saveSessionBtn');
             if (saveBtn) {
@@ -1211,18 +1246,7 @@
                         showToast('No drinks to save!', '#8b4500');
                         return;
                     }
-                    var peakEl = document.getElementById('peakBac');
-                    var session = {
-                        savedAt: Date.now(),
-                        mode: planningMode ? 'plan' : 'live',
-                        weight: document.getElementById('weight').value,
-                        gender: document.getElementById('gender').value,
-                        drinks: drinks.slice(),
-                        peakBac: peakEl ? peakEl.textContent : '—',
-                        soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
-                        totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
-                        effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—'
-                    };
+                    var session = buildSessionSnapshot();
                     var sessions = getSessions();
                     sessions.push(session);
                     saveSessions(sessions);
@@ -1239,19 +1263,7 @@
                         showToast('No drinks to export!', '#8b4500');
                         return;
                     }
-                    var peakEl = document.getElementById('peakBac');
-                    var session = {
-                        savedAt: Date.now(),
-                        mode: planningMode ? 'plan' : 'live',
-                        weight: document.getElementById('weight').value,
-                        gender: document.getElementById('gender').value,
-                        drinks: drinks.slice(),
-                        peakBac: peakEl ? peakEl.textContent : '—',
-                        soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
-                        totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
-                        effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—'
-                    };
-                    exportSessionAsHTML(session);
+                    exportSessionAsHTML(buildSessionSnapshot());
                 };
             }
 
@@ -1269,6 +1281,11 @@
                     drinksRows += '<tr><td>' + (d.name || '—') + '</td><td>' + d.alcohol + '%</td><td>' +
                         Math.round(d.volume) + ' ml</td><td>' + timing + '</td></tr>';
                 }
+
+                var chartSection = s.chartImage
+                    ? '<div class="card"><h2>BAC Over Time</h2>' +
+                      '<img src="' + s.chartImage + '" style="width:100%;border-radius:8px;" alt="BAC Chart"></div>'
+                    : '';
 
                 var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
                     '<title>BAC Session Report – ' + dateStr + '</title>' +
@@ -1300,6 +1317,7 @@
                     '<div><div class="stat-val">' + (s.soberTime || '—') + '</div><div class="stat-label">Hours Until Sober</div></div>' +
                     '<div><div class="stat-val">' + s.drinks.length + '</div><div class="stat-label">Drinks Logged</div></div>' +
                     '</div></div>' +
+                    chartSection +
                     '<div class="card"><h2>Drinks Log</h2>' +
                     '<table><thead><tr><th>Drink</th><th>ABV</th><th>Volume</th><th>Timing</th></tr></thead><tbody>' +
                     drinksRows + '</tbody></table></div>' +
