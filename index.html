@@ -264,8 +264,106 @@
             font-size: 13px;
             color: #9b72cc;
         }
-        .effects-box p, .warning p { color: #b0b0d0; }
+        /* Session History */
+        .history-section {
+            padding: 20px;
+            border-top: 1px solid #2e2e4e;
+        }
+        .history-section h3 {
+            color: #c0c0e0;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .history-empty {
+            text-align: center;
+            padding: 20px;
+            color: #5a5a7a;
+            font-size: 14px;
+        }
+        .session-card {
+            background: #12121f;
+            border: 1px solid #2e2e4e;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .session-info { flex: 1; }
+        .session-date {
+            font-weight: 600;
+            color: #d0d0f0;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .session-meta {
+            font-size: 12px;
+            color: #6a6a8a;
+        }
+        .session-peak {
+            font-size: 20px;
+            font-weight: 700;
+            color: #dc5050;
+            text-align: right;
+            min-width: 60px;
+        }
+        .session-peak-label {
+            font-size: 10px;
+            color: #6a6a8a;
+            text-align: right;
+        }
+        .session-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .session-btn {
+            background: #3d35a8;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .session-btn.danger { background: #8b0000; }
+        .btn-save {
+            background: linear-gradient(135deg, #1a6b3a 0%, #27a356 100%);
+            font-size: 15px;
+            padding: 13px;
+        }
+        .btn-export {
+            background: linear-gradient(135deg, #1a4a8b 0%, #2563c4 100%);
+            font-size: 15px;
+            padding: 13px;
+        }
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #27a356;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+            z-index: 999;
+            pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
         p { color: #b0b0d0; }
+        .effects-box p, .warning p { color: #b0b0d0; }
         @media (max-width: 480px) {
             .info-grid { grid-template-columns: 1fr; }
             .time-inputs { grid-template-columns: 1fr; }
@@ -414,8 +512,19 @@
             </div>
 
             <button class="btn btn-reset" id="resetBtn">Reset All Drinks</button>
+            <div class="action-row">
+                <button class="btn btn-save" id="saveSessionBtn">💾 Save Session</button>
+                <button class="btn btn-export" id="exportHtmlBtn">📄 Export Report</button>
+            </div>
+        </div>
+
+        <!-- Session History -->
+        <div class="history-section">
+            <h3>📚 Session History</h3>
+            <div id="historyList"><div class="history-empty">No saved sessions yet. Add drinks and tap "Save Session" to record a night.</div></div>
         </div>
     </div>
+    <div class="toast" id="toast"></div>
 
     <script type="text/javascript">
         (function() {
@@ -1015,6 +1124,202 @@
                     }
                 };
             }
+
+            // ── Toast helper ──────────────────────────────────────────
+            function showToast(msg, color) {
+                var t = document.getElementById('toast');
+                t.textContent = msg;
+                t.style.background = color || '#27a356';
+                t.classList.add('show');
+                setTimeout(function() { t.classList.remove('show'); }, 2500);
+            }
+
+            // ── localStorage helpers ───────────────────────────────────
+            function getSessions() {
+                try { return JSON.parse(localStorage.getItem('bac_sessions') || '[]'); }
+                catch(e) { return []; }
+            }
+            function saveSessions(arr) {
+                localStorage.setItem('bac_sessions', JSON.stringify(arr));
+            }
+
+            // ── Render history list ────────────────────────────────────
+            function renderHistory() {
+                var list = document.getElementById('historyList');
+                var sessions = getSessions();
+                if (sessions.length === 0) {
+                    list.innerHTML = '<div class="history-empty">No saved sessions yet. Add drinks and tap "Save Session" to record a night.</div>';
+                    return;
+                }
+                var html = '';
+                for (var i = sessions.length - 1; i >= 0; i--) {
+                    var s = sessions[i];
+                    var date = new Date(s.savedAt);
+                    var dateStr = date.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+                    var timeStr = date.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+                    html += '<div class="session-card">' +
+                        '<div class="session-info">' +
+                            '<div class="session-date">' + dateStr + ' · ' + timeStr + '</div>' +
+                            '<div class="session-meta">' + s.drinks.length + ' drink' + (s.drinks.length !== 1 ? 's' : '') +
+                            ' · ' + (s.gender || '?') + ' · ' + (s.weight || '?') + 'kg' +
+                            ' · ' + (s.mode === 'plan' ? 'Planned' : 'Live') + '</div>' +
+                        '</div>' +
+                        '<div style="text-align:right;margin-right:10px;">' +
+                            '<div class="session-peak">' + (s.peakBac || '—') + '</div>' +
+                            '<div class="session-peak-label">peak BAC</div>' +
+                        '</div>' +
+                        '<div class="session-actions">' +
+                            '<button class="session-btn" data-export="' + i + '">📄</button>' +
+                            '<button class="session-btn danger" data-delete="' + i + '">🗑</button>' +
+                        '</div>' +
+                    '</div>';
+                }
+                list.innerHTML = html;
+
+                // Export buttons
+                var exportBtns = list.querySelectorAll('[data-export]');
+                for (var j = 0; j < exportBtns.length; j++) {
+                    exportBtns[j].onclick = function() {
+                        var idx = parseInt(this.getAttribute('data-export'));
+                        var sessions2 = getSessions();
+                        // Map reversed index back
+                        var realIdx = sessions2.length - 1 - idx;
+                        exportSessionAsHTML(sessions2[realIdx < 0 ? 0 : realIdx]);
+                    };
+                }
+                // Delete buttons
+                var delBtns = list.querySelectorAll('[data-delete]');
+                for (var k = 0; k < delBtns.length; k++) {
+                    delBtns[k].onclick = function() {
+                        if (!confirm('Delete this session?')) return;
+                        var idx = parseInt(this.getAttribute('data-delete'));
+                        var sessions3 = getSessions();
+                        var realIdx = sessions3.length - 1 - idx;
+                        sessions3.splice(realIdx < 0 ? 0 : realIdx, 1);
+                        saveSessions(sessions3);
+                        renderHistory();
+                        showToast('Session deleted', '#8b0000');
+                    };
+                }
+            }
+
+            // ── Save current session ───────────────────────────────────
+            var saveBtn = document.getElementById('saveSessionBtn');
+            if (saveBtn) {
+                saveBtn.onclick = function() {
+                    if (drinks.length === 0) {
+                        showToast('No drinks to save!', '#8b4500');
+                        return;
+                    }
+                    var peakEl = document.getElementById('peakBac');
+                    var session = {
+                        savedAt: Date.now(),
+                        mode: planningMode ? 'plan' : 'live',
+                        weight: document.getElementById('weight').value,
+                        gender: document.getElementById('gender').value,
+                        drinks: drinks.slice(),
+                        peakBac: peakEl ? peakEl.textContent : '—',
+                        soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
+                        totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
+                        effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—'
+                    };
+                    var sessions = getSessions();
+                    sessions.push(session);
+                    saveSessions(sessions);
+                    renderHistory();
+                    showToast('✅ Session saved!');
+                };
+            }
+
+            // ── Export current session as HTML ─────────────────────────
+            var exportBtn = document.getElementById('exportHtmlBtn');
+            if (exportBtn) {
+                exportBtn.onclick = function() {
+                    if (drinks.length === 0) {
+                        showToast('No drinks to export!', '#8b4500');
+                        return;
+                    }
+                    var peakEl = document.getElementById('peakBac');
+                    var session = {
+                        savedAt: Date.now(),
+                        mode: planningMode ? 'plan' : 'live',
+                        weight: document.getElementById('weight').value,
+                        gender: document.getElementById('gender').value,
+                        drinks: drinks.slice(),
+                        peakBac: peakEl ? peakEl.textContent : '—',
+                        soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
+                        totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
+                        effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—'
+                    };
+                    exportSessionAsHTML(session);
+                };
+            }
+
+            function exportSessionAsHTML(s) {
+                var date = new Date(s.savedAt);
+                var dateStr = date.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+                var timeStr = date.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+
+                var drinksRows = '';
+                for (var i = 0; i < s.drinks.length; i++) {
+                    var d = s.drinks[i];
+                    var timing = s.mode === 'plan'
+                        ? (d.startTime + 'h → ' + d.endTime + 'h')
+                        : (d.drinkingTime + 'h drinking time');
+                    drinksRows += '<tr><td>' + (d.name || '—') + '</td><td>' + d.alcohol + '%</td><td>' +
+                        Math.round(d.volume) + ' ml</td><td>' + timing + '</td></tr>';
+                }
+
+                var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+                    '<title>BAC Session Report – ' + dateStr + '</title>' +
+                    '<style>' +
+                    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0f0c29;color:#d0d0f0;padding:30px;max-width:650px;margin:0 auto;}' +
+                    'h1{color:#dc5050;font-size:26px;margin-bottom:4px;}' +
+                    '.subtitle{color:#7a7a9a;font-size:14px;margin-bottom:30px;}' +
+                    '.card{background:#1e1e2e;border:1px solid #2e2e4e;border-radius:12px;padding:20px;margin-bottom:20px;}' +
+                    '.card h2{color:#a0a0c0;font-size:13px;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}' +
+                    '.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;}' +
+                    '.stat-val{font-size:28px;font-weight:700;color:#7b72e9;}' +
+                    '.stat-label{font-size:12px;color:#6a6a8a;margin-top:2px;}' +
+                    'table{width:100%;border-collapse:collapse;font-size:14px;}' +
+                    'th{text-align:left;color:#6a6a8a;font-weight:600;padding:6px 8px;border-bottom:1px solid #2e2e4e;}' +
+                    'td{padding:8px 8px;border-bottom:1px solid #1a1a2e;color:#c0c0e0;}' +
+                    'tr:last-child td{border-bottom:none;}' +
+                    '.effects-text{color:#b0b0d0;font-size:14px;line-height:1.6;}' +
+                    '.footer{text-align:center;color:#3a3a5a;font-size:12px;margin-top:30px;}' +
+                    '</style></head><body>' +
+                    '<h1>🍺 BAC Session Report</h1>' +
+                    '<div class="subtitle">' + dateStr + ' · ' + timeStr + ' · ' + (s.mode === 'plan' ? 'Planned session' : 'Live tracked session') + '</div>' +
+                    '<div class="card"><h2>Profile</h2><div class="stats">' +
+                    '<div><div class="stat-val">' + (s.weight || '—') + ' kg</div><div class="stat-label">Body Weight</div></div>' +
+                    '<div><div class="stat-val">' + (s.gender ? s.gender.charAt(0).toUpperCase() + s.gender.slice(1) : '—') + '</div><div class="stat-label">Gender</div></div>' +
+                    '</div></div>' +
+                    '<div class="card"><h2>Summary Stats</h2><div class="stats">' +
+                    '<div><div class="stat-val">' + (s.peakBac || '—') + '</div><div class="stat-label">Peak BAC</div></div>' +
+                    '<div><div class="stat-val">' + (s.totalDrinks || '—') + '</div><div class="stat-label">Standard Drinks</div></div>' +
+                    '<div><div class="stat-val">' + (s.soberTime || '—') + '</div><div class="stat-label">Hours Until Sober</div></div>' +
+                    '<div><div class="stat-val">' + s.drinks.length + '</div><div class="stat-label">Drinks Logged</div></div>' +
+                    '</div></div>' +
+                    '<div class="card"><h2>Drinks Log</h2>' +
+                    '<table><thead><tr><th>Drink</th><th>ABV</th><th>Volume</th><th>Timing</th></tr></thead><tbody>' +
+                    drinksRows + '</tbody></table></div>' +
+                    '<div class="card"><h2>Effects at Peak BAC</h2><p class="effects-text">' + (s.effects || '—') + '</p></div>' +
+                    '<div class="footer">Generated by BAC Calculator · For educational purposes only · Do not use to determine fitness to drive</div>' +
+                    '</body></html>';
+
+                var blob = new Blob([html], { type: 'text/html' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'BAC-Report-' + date.toISOString().slice(0,10) + '.html';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('📄 Report downloaded!', '#2563c4');
+            }
+
+            // Load history on startup
+            renderHistory();
+
         })();
     </script>
 </body>
