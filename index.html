@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="BAC Calculator">
     <title>BAC Calculator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -439,9 +440,14 @@
             font-size: 15px;
             padding: 13px;
         }
+        .btn-xlsx {
+            background: linear-gradient(135deg, #1a5c2e 0%, #1e7a3a 100%);
+            font-size: 15px;
+            padding: 13px;
+        }
         .action-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
             margin-top: 10px;
         }
@@ -626,7 +632,8 @@
             <button class="btn btn-reset" id="resetBtn">Reset All Drinks</button>
             <div class="action-row">
                 <button class="btn btn-save" id="saveSessionBtn">💾 Save Session</button>
-                <button class="btn btn-export" id="exportHtmlBtn">📄 Export Report</button>
+                <button class="btn btn-export" id="exportHtmlBtn">📄 HTML Report</button>
+                <button class="btn btn-xlsx" id="exportXlsxBtn">📊 Spreadsheet</button>
             </div>
         </div>
 
@@ -1354,21 +1361,31 @@
                         '</div>' +
                         '<div class="session-actions">' +
                             '<button class="session-btn" data-export="' + i + '">📄</button>' +
+                            '<button class="session-btn" style="background:#1a5c2e;" data-export-xlsx="' + i + '">📊</button>' +
                             '<button class="session-btn danger" data-delete="' + i + '">🗑</button>' +
                         '</div>' +
                     '</div>';
                 }
                 list.innerHTML = html;
 
-                // Export buttons
+                // Export HTML buttons
                 var exportBtns = list.querySelectorAll('[data-export]');
                 for (var j = 0; j < exportBtns.length; j++) {
                     exportBtns[j].onclick = function() {
                         var idx = parseInt(this.getAttribute('data-export'));
                         var sessions2 = getSessions();
-                        // Map reversed index back
                         var realIdx = sessions2.length - 1 - idx;
                         exportSessionAsHTML(sessions2[realIdx < 0 ? 0 : realIdx]);
+                    };
+                }
+                // Export XLSX buttons
+                var exportXlsxBtns = list.querySelectorAll('[data-export-xlsx]');
+                for (var jx = 0; jx < exportXlsxBtns.length; jx++) {
+                    exportXlsxBtns[jx].onclick = function() {
+                        var idx = parseInt(this.getAttribute('data-export-xlsx'));
+                        var sessions2x = getSessions();
+                        var realIdx = sessions2x.length - 1 - idx;
+                        exportSessionAsXLSX(sessions2x[realIdx < 0 ? 0 : realIdx]);
                     };
                 }
                 // Delete buttons
@@ -1428,6 +1445,115 @@
                     renderHistory();
                     showToast('✅ Session saved!');
                 };
+            }
+
+            // ── Export current session as XLSX ─────────────────────────
+            var exportXlsxBtn = document.getElementById('exportXlsxBtn');
+            if (exportXlsxBtn) {
+                exportXlsxBtn.onclick = function() {
+                    if (drinks.length === 0) {
+                        showToast('No drinks to export!', '#8b4500');
+                        return;
+                    }
+                    exportSessionAsXLSX(buildSessionSnapshot());
+                };
+            }
+
+            function exportSessionAsXLSX(s) {
+                var date = new Date(s.savedAt);
+                var dateStr = date.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+                var timeStr = date.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+                var wb = XLSX.utils.book_new();
+
+                // ── Sheet 1: Summary ──────────────────────────────────
+                var summaryData = [
+                    ['BAC Session Report'],
+                    [dateStr + ' · ' + timeStr],
+                    ['Mode', s.mode === 'plan' ? 'Planned' : 'Live Tracked'],
+                    [],
+                    ['PROFILE'],
+                    ['Body Weight (kg)', parseFloat(s.weight) || s.weight],
+                    ['Gender', s.gender ? s.gender.charAt(0).toUpperCase() + s.gender.slice(1) : '—'],
+                    [],
+                    ['SUMMARY STATS'],
+                    ['Peak BAC', s.peakBac],
+                    ['Standard Drinks', s.totalDrinks],
+                    ['Hours Until Sober', s.soberTime],
+                    ['Total Drinks Logged', s.drinks.length],
+                    [],
+                    ['EFFECTS AT PEAK BAC'],
+                    [s.effects || '—'],
+                ];
+                if (s.generalNote) {
+                    summaryData.push([]);
+                    summaryData.push(['SESSION NOTE']);
+                    summaryData.push([s.generalNote]);
+                }
+                var wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+                wsSummary['!cols'] = [{ wch: 28 }, { wch: 50 }];
+                // Style title row
+                if (wsSummary['A1']) { wsSummary['A1'].s = { font: { bold: true, sz: 16 } }; }
+                XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+                // ── Sheet 2: Drinks Log ───────────────────────────────
+                var drinkHeaders = s.mode === 'plan'
+                    ? ['#', 'Drink', 'ABV (%)', 'Volume (ml)', 'Start Time (h)', 'End Time (h)', 'Duration (h)', 'Alcohol (g)', 'Standard Drinks']
+                    : ['#', 'Drink', 'ABV (%)', 'Volume (ml)', 'Drinking Time (h)', 'Alcohol (g)', 'Standard Drinks'];
+                var drinkRows = [drinkHeaders];
+                var alcoholDensity = 0.789;
+                for (var i = 0; i < s.drinks.length; i++) {
+                    var d = s.drinks[i];
+                    var alcoholG = Math.round((d.alcohol / 100) * d.volume * alcoholDensity * 100) / 100;
+                    var stdDrinks = Math.round(alcoholG / 14 * 100) / 100;
+                    var volMl = Math.round(d.volume);
+                    if (s.mode === 'plan') {
+                        drinkRows.push([
+                            i + 1, d.name || '—',
+                            d.alcohol, volMl,
+                            d.startTime, d.endTime,
+                            Math.round((d.endTime - d.startTime) * 100) / 100,
+                            alcoholG, stdDrinks
+                        ]);
+                    } else {
+                        drinkRows.push([
+                            i + 1, d.name || '—',
+                            d.alcohol, volMl,
+                            d.drinkingTime,
+                            alcoholG, stdDrinks
+                        ]);
+                    }
+                }
+                // Totals row
+                var totalAlcohol = 0, totalStd = 0;
+                for (var ti = 0; ti < s.drinks.length; ti++) {
+                    totalAlcohol += (s.drinks[ti].alcohol / 100) * s.drinks[ti].volume * alcoholDensity;
+                    totalStd += ((s.drinks[ti].alcohol / 100) * s.drinks[ti].volume * alcoholDensity) / 14;
+                }
+                if (s.mode === 'plan') {
+                    drinkRows.push(['', 'TOTAL', '', '', '', '', '', Math.round(totalAlcohol*100)/100, Math.round(totalStd*100)/100]);
+                } else {
+                    drinkRows.push(['', 'TOTAL', '', '', '', Math.round(totalAlcohol*100)/100, Math.round(totalStd*100)/100]);
+                }
+                var wsDrinks = XLSX.utils.aoa_to_sheet(drinkRows);
+                wsDrinks['!cols'] = [
+                    {wch:4},{wch:18},{wch:10},{wch:13},{wch:18},{wch:18},{wch:14},{wch:13},{wch:16}
+                ];
+                XLSX.utils.book_append_sheet(wb, wsDrinks, 'Drinks Log');
+
+                // ── Sheet 3: Timestamped Notes (if any) ───────────────
+                if (s.timestampedNotes && s.timestampedNotes.length > 0) {
+                    var noteRows = [['Time', 'Note']];
+                    for (var ni = 0; ni < s.timestampedNotes.length; ni++) {
+                        noteRows.push([s.timestampedNotes[ni].timeStr, s.timestampedNotes[ni].text]);
+                    }
+                    var wsNotes = XLSX.utils.aoa_to_sheet(noteRows);
+                    wsNotes['!cols'] = [{ wch: 16 }, { wch: 60 }];
+                    XLSX.utils.book_append_sheet(wb, wsNotes, 'Timestamped Notes');
+                }
+
+                var filename = 'BAC-Session-' + date.toISOString().slice(0, 10) + '.xlsx';
+                XLSX.writeFile(wb, filename);
+                showToast('📊 Spreadsheet downloaded!', '#1a5c2e');
             }
 
             // ── Export current session as HTML ─────────────────────────
