@@ -1042,15 +1042,17 @@
                     }
                 }
                 
-                // Time until sober
-                var soberTime = 0;
+                // Time until sober - find when BAC drops back to ~0 after peaking
+                var soberTime = maxTime;
+                var peakSeen = false;
                 for (var i = 0; i < bacValues.length; i++) {
-                    if (bacValues[i] < 0.001) {
+                    if (bacValues[i] >= 0.001) {
+                        peakSeen = true;
+                    } else if (peakSeen) {
                         soberTime = parseFloat(timePoints[i]);
                         break;
                     }
                 }
-                if (soberTime === 0) soberTime = maxTime;
                 
                 // Total standard drinks
                 var totalStandardDrinks = 0;
