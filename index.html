@@ -264,6 +264,105 @@
             font-size: 13px;
             color: #9b72cc;
         }
+        /* Notes */
+        .notes-section {
+            background: #12121f;
+            border: 1px solid #2e2e4e;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .notes-section h3 {
+            color: #c0c0e0;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .notes-section textarea {
+            width: 100%;
+            background: #1a1a2e;
+            border: 2px solid #2e2e4e;
+            border-radius: 8px;
+            color: #e0e0f0;
+            font-size: 14px;
+            padding: 10px;
+            resize: vertical;
+            min-height: 70px;
+            font-family: inherit;
+        }
+        .notes-section textarea:focus {
+            outline: none;
+            border-color: #5a4fcf;
+        }
+        .notes-section textarea::placeholder { color: #4a4a6a; }
+        .timestamped-note-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .timestamped-note-row input {
+            flex: 1;
+            padding: 9px 12px;
+            background: #1a1a2e;
+            border: 2px solid #2e2e4e;
+            border-radius: 8px;
+            color: #e0e0f0;
+            font-size: 14px;
+        }
+        .timestamped-note-row input:focus {
+            outline: none;
+            border-color: #5a4fcf;
+        }
+        .timestamped-note-row input::placeholder { color: #4a4a6a; }
+        .btn-add-note {
+            background: #3d35a8;
+            color: white;
+            border: none;
+            padding: 9px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .note-item {
+            background: #1a1a2e;
+            border-left: 3px solid #5a4fcf;
+            border-radius: 0 6px 6px 0;
+            padding: 8px 10px;
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .note-item-text {
+            font-size: 13px;
+            color: #c0c0e0;
+            flex: 1;
+            line-height: 1.5;
+        }
+        .note-item-time {
+            font-size: 11px;
+            color: #5a5a7a;
+            margin-top: 2px;
+        }
+        .note-remove-btn {
+            background: none;
+            border: none;
+            color: #5a5a7a;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0 2px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .note-remove-btn:hover { color: #e74c3c; }
+        .notes-hint {
+            font-size: 11px;
+            color: #5a5a7a;
+            margin-top: 6px;
+        }
         /* Session History */
         .history-section {
             padding: 20px;
@@ -511,6 +610,19 @@
                 <p>Your BAC exceeds 0.08%. Do not drive or operate machinery.</p>
             </div>
 
+            <!-- Notes -->
+            <div class="notes-section">
+                <h3>📝 Session Notes</h3>
+                <label for="sessionNote" style="font-size:12px;color:#7a7a9a;margin-bottom:6px;font-weight:500;">General note (saved with session)</label>
+                <textarea id="sessionNote" placeholder="Add a general note about this session…"></textarea>
+                <div class="timestamped-note-row">
+                    <input type="text" id="timestampedNoteInput" placeholder="Add a timestamped note…">
+                    <button class="btn-add-note" id="addTimestampedNote">+ Add</button>
+                </div>
+                <div class="notes-hint">Timestamped notes record the current time when added.</div>
+                <div id="timestampedNotesList"></div>
+            </div>
+
             <button class="btn btn-reset" id="resetBtn">Reset All Drinks</button>
             <div class="action-row">
                 <button class="btn btn-save" id="saveSessionBtn">💾 Save Session</button>
@@ -532,6 +644,7 @@
             
             var bacChart = null;
             var drinks = [];
+            var timestampedNotes = [];
             var sessionStartTime = null;
             var updateInterval = null;
             var planningMode = false;
@@ -1115,6 +1228,7 @@
                 resetBtn.onclick = function() {
                     if (confirm('Are you sure you want to clear all drinks and start over?')) {
                         drinks = [];
+                        timestampedNotes = [];
                         sessionStartTime = null;
                         document.getElementById('results').className = 'results';
                         document.getElementById('alcohol').value = '';
@@ -1124,6 +1238,9 @@
                         document.getElementById('endTime').value = '0.5';
                         document.getElementById('preset').value = '';
                         document.getElementById('editIndex').value = '-1';
+                        document.getElementById('sessionNote').value = '';
+                        document.getElementById('timestampedNoteInput').value = '';
+                        renderTimestampedNotes();
                         addBtn.textContent = 'Add Drink';
                         
                         if (updateInterval) {
@@ -1133,6 +1250,60 @@
                         
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
+                };
+            }
+
+            // ── Timestamped notes ──────────────────────────────────────
+            function renderTimestampedNotes() {
+                var list = document.getElementById('timestampedNotesList');
+                if (!list) return;
+                if (timestampedNotes.length === 0) {
+                    list.innerHTML = '';
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < timestampedNotes.length; i++) {
+                    var n = timestampedNotes[i];
+                    html += '<div class="note-item">' +
+                        '<div style="flex:1;">' +
+                            '<div class="note-item-text">' + escapeHtml(n.text) + '</div>' +
+                            '<div class="note-item-time">🕐 ' + n.timeStr + '</div>' +
+                        '</div>' +
+                        '<button class="note-remove-btn" data-note-index="' + i + '">✕</button>' +
+                    '</div>';
+                }
+                list.innerHTML = html;
+                var removeBtns = list.querySelectorAll('[data-note-index]');
+                for (var j = 0; j < removeBtns.length; j++) {
+                    removeBtns[j].onclick = function() {
+                        var idx = parseInt(this.getAttribute('data-note-index'));
+                        timestampedNotes.splice(idx, 1);
+                        renderTimestampedNotes();
+                    };
+                }
+            }
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            }
+
+            var addNoteBtn = document.getElementById('addTimestampedNote');
+            if (addNoteBtn) {
+                addNoteBtn.onclick = function() {
+                    var input = document.getElementById('timestampedNoteInput');
+                    var text = input.value.trim();
+                    if (!text) return;
+                    var now = new Date();
+                    var timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    timestampedNotes.push({ text: text, timeStr: timeStr, timestamp: now.getTime() });
+                    input.value = '';
+                    renderTimestampedNotes();
+                };
+                // Also allow Enter key to add note
+                document.getElementById('timestampedNoteInput').onkeydown = function(e) {
+                    if (e.key === 'Enter') { addNoteBtn.click(); }
                 };
             }
 
@@ -1234,7 +1405,9 @@
                     soberTime: document.getElementById('soberTime') ? document.getElementById('soberTime').textContent : '—',
                     totalDrinks: document.getElementById('totalDrinks') ? document.getElementById('totalDrinks').textContent : '—',
                     effects: document.getElementById('effects') ? document.getElementById('effects').textContent : '—',
-                    chartImage: getChartImage()
+                    chartImage: getChartImage(),
+                    generalNote: (document.getElementById('sessionNote') ? document.getElementById('sessionNote').value.trim() : ''),
+                    timestampedNotes: timestampedNotes.slice()
                 };
             }
 
@@ -1287,6 +1460,23 @@
                       '<img src="' + s.chartImage + '" style="width:100%;border-radius:8px;" alt="BAC Chart"></div>'
                     : '';
 
+                var generalNoteSection = (s.generalNote && s.generalNote.length > 0)
+                    ? '<div class="card"><h2>Session Note</h2><p class="effects-text" style="white-space:pre-wrap;">' + escapeHtml(s.generalNote) + '</p></div>'
+                    : '';
+
+                var timestampedNotesSection = '';
+                if (s.timestampedNotes && s.timestampedNotes.length > 0) {
+                    var notesRows = '';
+                    for (var ni = 0; ni < s.timestampedNotes.length; ni++) {
+                        var tn = s.timestampedNotes[ni];
+                        notesRows += '<div style="border-left:3px solid #5a4fcf;padding:8px 12px;margin-bottom:8px;background:#12121f;border-radius:0 6px 6px 0;">' +
+                            '<div style="font-size:13px;color:#c0c0e0;line-height:1.5;">' + escapeHtml(tn.text) + '</div>' +
+                            '<div style="font-size:11px;color:#5a5a7a;margin-top:3px;">🕐 ' + tn.timeStr + '</div>' +
+                        '</div>';
+                    }
+                    timestampedNotesSection = '<div class="card"><h2>Timestamped Notes</h2>' + notesRows + '</div>';
+                }
+
                 var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
                     '<title>BAC Session Report – ' + dateStr + '</title>' +
                     '<style>' +
@@ -1322,6 +1512,8 @@
                     '<table><thead><tr><th>Drink</th><th>ABV</th><th>Volume</th><th>Timing</th></tr></thead><tbody>' +
                     drinksRows + '</tbody></table></div>' +
                     '<div class="card"><h2>Effects at Peak BAC</h2><p class="effects-text">' + (s.effects || '—') + '</p></div>' +
+                    generalNoteSection +
+                    timestampedNotesSection +
                     '<div class="footer">Generated by BAC Calculator · For educational purposes only · Do not use to determine fitness to drive</div>' +
                     '</body></html>';
 
