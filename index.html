@@ -674,6 +674,7 @@
                 planTimeGroup.style.display = 'none';
                 document.getElementById('bacLabel').textContent = 'Current Blood Alcohol Content';
                 document.getElementById('effectsTitle').textContent = 'Expected Effects at Current BAC';
+                autosaveState();
             };
             
             planBtn.onclick = function() {
@@ -685,6 +686,7 @@
                 planTimeGroup.style.display = 'block';
                 document.getElementById('bacLabel').textContent = 'Predicted BAC Timeline';
                 document.getElementById('effectsTitle').textContent = 'Peak Effects';
+                autosaveState();
             };
             
             var presetEl = document.getElementById('preset');
@@ -815,6 +817,7 @@
                         drinks.splice(index, 1);
                         if (drinks.length === 0) {
                             sessionStartTime = null;
+                            clearAutosave();
                             document.getElementById('results').className = 'results';
                             if (updateInterval) {
                                 clearInterval(updateInterval);
@@ -823,6 +826,7 @@
                         } else {
                             updateDrinksList();
                             calculateBAC();
+                            autosaveState();
                         }
                     };
                 }
@@ -1207,12 +1211,14 @@
                         
                         // Calculate and show results
                         calculateBAC();
+                        autosaveState();
                         document.getElementById('results').className = 'results show';
                         
                         // Start auto-update in live mode
                         if (!planningMode && !updateInterval) {
                             updateInterval = setInterval(function() {
                                 calculateBAC();
+                                autosaveState();
                             }, 60000);
                         }
                         
@@ -1239,6 +1245,7 @@
                         drinks = [];
                         timestampedNotes = [];
                         sessionStartTime = null;
+                        clearAutosave();
                         document.getElementById('results').className = 'results';
                         document.getElementById('alcohol').value = '';
                         document.getElementById('volume').value = '';
@@ -1288,6 +1295,7 @@
                         var idx = parseInt(this.getAttribute('data-note-index'));
                         timestampedNotes.splice(idx, 1);
                         renderTimestampedNotes();
+                        autosaveState();
                     };
                 }
             }
@@ -1309,11 +1317,18 @@
                     timestampedNotes.push({ text: text, timeStr: timeStr, timestamp: now.getTime() });
                     input.value = '';
                     renderTimestampedNotes();
+                    autosaveState();
                 };
                 // Also allow Enter key to add note
                 document.getElementById('timestampedNoteInput').onkeydown = function(e) {
                     if (e.key === 'Enter') { addNoteBtn.click(); }
                 };
+            }
+
+            // Autosave general note as user types
+            var sessionNoteEl = document.getElementById('sessionNote');
+            if (sessionNoteEl) {
+                sessionNoteEl.oninput = function() { autosaveState(); };
             }
 
             // ── Toast helper ──────────────────────────────────────────
@@ -1655,8 +1670,77 @@
                 showToast('📄 Report downloaded!', '#2563c4');
             }
 
+            // ── Active session autosave / restore ──────────────────────
+            var AUTOSAVE_KEY = 'bac_active_session';
+
+            function autosaveState() {
+                try {
+                    var state = {
+                        drinks: drinks,
+                        timestampedNotes: timestampedNotes,
+                        sessionStartTime: sessionStartTime,
+                        planningMode: planningMode,
+                        weight: document.getElementById('weight').value,
+                        gender: document.getElementById('gender').value,
+                        generalNote: document.getElementById('sessionNote') ? document.getElementById('sessionNote').value : '',
+                        savedAt: Date.now()
+                    };
+                    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state));
+                } catch(e) {}
+            }
+
+            function clearAutosave() {
+                try { localStorage.removeItem(AUTOSAVE_KEY); } catch(e) {}
+            }
+
+            function restoreState() {
+                try {
+                    var raw = localStorage.getItem(AUTOSAVE_KEY);
+                    if (!raw) return;
+                    var state = JSON.parse(raw);
+                    if (!state || !state.drinks || state.drinks.length === 0) return;
+
+                    // Restore data
+                    drinks = state.drinks;
+                    timestampedNotes = state.timestampedNotes || [];
+                    sessionStartTime = state.sessionStartTime || null;
+                    planningMode = state.planningMode || false;
+
+                    // Restore form fields
+                    if (state.weight) document.getElementById('weight').value = state.weight;
+                    if (state.gender) document.getElementById('gender').value = state.gender;
+                    if (state.generalNote && document.getElementById('sessionNote')) {
+                        document.getElementById('sessionNote').value = state.generalNote;
+                    }
+
+                    // Restore mode UI
+                    if (planningMode) {
+                        planBtn.className = 'mode-btn active';
+                        liveBtn.className = 'mode-btn';
+                        planningInfo.style.display = 'block';
+                        liveTimeGroup.style.display = 'none';
+                        planTimeGroup.style.display = 'block';
+                        document.getElementById('bacLabel').textContent = 'Predicted BAC Timeline';
+                        document.getElementById('effectsTitle').textContent = 'Peak Effects';
+                    }
+
+                    // Rebuild UI
+                    renderTimestampedNotes();
+                    calculateBAC();
+                    document.getElementById('results').className = 'results show';
+
+                    // Restart live update interval if in live mode
+                    if (!planningMode && !updateInterval) {
+                        updateInterval = setInterval(function() { calculateBAC(); autosaveState(); }, 60000);
+                    }
+
+                    showToast('Session restored ✓', '#3d35a8');
+                } catch(e) {}
+            }
+
             // Load history on startup
             renderHistory();
+            restoreState();
 
         })();
     </script>
