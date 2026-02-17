@@ -12,19 +12,20 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
             min-height: 100vh;
             padding: 20px;
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
-            background: white;
+            background: #1e1e2e;
             border-radius: 20px;
             overflow: hidden;
+            border: 1px solid #2e2e4e;
         }
         .header {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #8b0000 0%, #6d1a1a 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;
@@ -38,26 +39,27 @@
         }
         .mode-btn {
             padding: 8px 16px;
-            background: rgba(255,255,255,0.2);
-            border: 2px solid white;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.5);
             border-radius: 8px;
-            color: white;
+            color: rgba(255,255,255,0.8);
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
         }
         .mode-btn.active {
-            background: white;
-            color: #e74c3c;
+            background: rgba(255,255,255,0.2);
+            border-color: white;
+            color: white;
         }
         .disclaimer {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
+            background: #2a2400;
+            border-left: 4px solid #b8860b;
             padding: 15px;
             margin: 20px;
             border-radius: 5px;
             font-size: 13px;
-            color: #856404;
+            color: #d4a017;
         }
         .section { padding: 20px; }
         .form-group { margin-bottom: 20px; }
@@ -65,24 +67,27 @@
             display: block; 
             font-weight: 600; 
             margin-bottom: 8px; 
-            color: #555;
+            color: #a0a0c0;
             font-size: 14px;
         }
         input, select {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid #2e2e4e;
             border-radius: 10px;
             font-size: 16px;
-            background: white;
+            background: #12121f;
+            color: #e0e0f0;
         }
+        input::placeholder { color: #4a4a6a; }
         input:focus, select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #5a4fcf;
         }
+        select option { background: #12121f; color: #e0e0f0; }
         .hint {
             font-size: 12px;
-            color: #888;
+            color: #5a5a7a;
             margin-top: 5px;
         }
         .time-inputs {
@@ -93,7 +98,7 @@
         .btn {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3d35a8 0%, #5a4fcf 100%);
             color: white;
             border: none;
             border-radius: 10px;
@@ -103,25 +108,26 @@
             cursor: pointer;
         }
         .btn-add {
-            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            background: linear-gradient(135deg, #1a6b3a 0%, #27a356 100%);
         }
         .btn-reset {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #8b0000 0%, #b22222 100%);
             font-size: 16px;
             padding: 12px;
         }
         .results {
             padding: 20px;
-            background: #f8f9fa;
+            background: #161625;
             margin: 20px;
             border-radius: 15px;
             display: none;
+            border: 1px solid #2e2e4e;
         }
         .results.show { display: block; }
         .bac-display {
             text-align: center;
             padding: 30px;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #8b0000 0%, #6d1a1a 100%);
             border-radius: 15px;
             color: white;
             margin-bottom: 20px;
@@ -129,13 +135,14 @@
         .bac-value { font-size: 48px; font-weight: 700; margin-bottom: 10px; }
         .bac-label { font-size: 14px; opacity: 0.9; }
         .chart-container {
-            background: white;
+            background: #12121f;
             padding: 20px;
             border-radius: 15px;
             margin: 20px 0;
+            border: 1px solid #2e2e4e;
         }
         .chart-container h3 {
-            color: #333;
+            color: #c0c0e0;
             margin-bottom: 15px;
             font-size: 18px;
             text-align: center;
@@ -147,59 +154,61 @@
             margin: 20px 0;
         }
         .info-card {
-            background: white;
+            background: #12121f;
             padding: 15px;
             border-radius: 10px;
             text-align: center;
+            border: 1px solid #2e2e4e;
         }
         .info-value { 
             font-size: 24px; 
             font-weight: 700; 
-            color: #667eea;
+            color: #7b72e9;
             margin-bottom: 5px;
         }
-        .info-label { font-size: 13px; color: #666; }
+        .info-label { font-size: 13px; color: #6a6a8a; }
         .drinks-log {
-            background: white;
+            background: #12121f;
             padding: 15px;
             border-radius: 10px;
             margin: 20px 0;
+            border: 1px solid #2e2e4e;
         }
         .drinks-log h3 {
-            color: #333;
+            color: #c0c0e0;
             margin-bottom: 15px;
             font-size: 18px;
         }
         .drink-item {
-            background: #f8f9fa;
+            background: #1a1a2e;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #5a4fcf;
         }
         .drink-item.planned {
-            border-left-color: #9b59b6;
-            background: #f3e5f5;
+            border-left-color: #7b3fa0;
+            background: #1e1228;
         }
         .drink-info {
             flex: 1;
         }
         .drink-name {
             font-weight: 600;
-            color: #333;
+            color: #d0d0f0;
             font-size: 14px;
         }
         .drink-details {
             font-size: 12px;
-            color: #666;
+            color: #7a7a9a;
             margin-top: 4px;
         }
         .drink-time {
             font-size: 11px;
-            color: #999;
+            color: #5a5a7a;
             margin-top: 4px;
         }
         .drink-actions {
@@ -207,7 +216,7 @@
             gap: 5px;
         }
         .edit-btn, .remove-btn {
-            background: #667eea;
+            background: #3d35a8;
             color: white;
             border: none;
             padding: 6px 12px;
@@ -216,45 +225,47 @@
             cursor: pointer;
         }
         .remove-btn {
-            background: #e74c3c;
+            background: #8b0000;
         }
         .effects-box {
-            background: #e8f4fd;
-            border-left: 4px solid #2196F3;
+            background: #0d1a2e;
+            border-left: 4px solid #1a6aa8;
             padding: 15px;
             margin: 20px 0;
             border-radius: 5px;
         }
         .effects-box h3 { 
-            color: #1976D2; 
+            color: #4fa3e0; 
             margin-bottom: 10px; 
             font-size: 16px;
         }
         .warning {
-            background: #ffebee;
-            border-left: 4px solid #f44336;
+            background: #1e0a0a;
+            border-left: 4px solid #c0392b;
             padding: 15px;
             margin: 20px 0;
             border-radius: 5px;
             display: none;
         }
         .warning.show { display: block; }
-        .warning h3 { color: #c62828; margin-bottom: 10px; font-size: 16px; }
+        .warning h3 { color: #e74c3c; margin-bottom: 10px; font-size: 16px; }
         .empty-log {
             text-align: center;
             padding: 20px;
-            color: #999;
+            color: #5a5a7a;
             font-size: 14px;
         }
         .planning-mode-info {
-            background: #e8eaf6;
-            border-left: 4px solid #673ab7;
+            background: #130d1e;
+            border-left: 4px solid #6a3fa0;
             padding: 15px;
             margin: 20px;
             border-radius: 5px;
             font-size: 13px;
-            color: #4527a0;
+            color: #9b72cc;
         }
+        .effects-box p, .warning p { color: #b0b0d0; }
+        p { color: #b0b0d0; }
         @media (max-width: 480px) {
             .info-grid { grid-template-columns: 1fr; }
             .time-inputs { grid-template-columns: 1fr; }
@@ -283,7 +294,7 @@
         </div>
 
         <div class="section">
-            <h3 style="margin-bottom: 15px; color: #333;">Your Details</h3>
+            <h3 style="margin-bottom: 15px; color: #c0c0e0;">Your Details</h3>
             
             <div class="form-group">
                 <label for="weight">Body Weight (kg)</label>
@@ -300,7 +311,7 @@
                 </select>
             </div>
 
-            <h3 style="margin: 20px 0 15px 0; color: #333;">Add a Drink</h3>
+            <h3 style="margin: 20px 0 15px 0; color: #c0c0e0;">Add a Drink</h3>
 
             <div class="form-group">
                 <label for="preset">Quick Presets</label>
@@ -619,8 +630,8 @@
                 var datasets = [{
                     label: 'BAC (%)',
                     data: bacValues,
-                    backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                    borderColor: 'rgba(192, 57, 43, 1)',
+                    backgroundColor: 'rgba(139, 0, 0, 0.3)',
+                    borderColor: 'rgba(220, 80, 80, 1)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4,
@@ -631,16 +642,16 @@
                         return Math.abs(time - currentTimeHours) < 0.2 ? 8 : 2;
                     },
                     pointBackgroundColor: function(context) {
-                        if (planningMode) return 'rgba(192, 57, 43, 1)';
+                        if (planningMode) return 'rgba(220, 80, 80, 1)';
                         var index = context.dataIndex;
                         var time = parseFloat(timePoints[index]);
-                        return Math.abs(time - currentTimeHours) < 0.2 ? '#2196F3' : 'rgba(192, 57, 43, 1)';
+                        return Math.abs(time - currentTimeHours) < 0.2 ? '#7b72e9' : 'rgba(220, 80, 80, 1)';
                     },
                     pointBorderColor: function(context) {
-                        if (planningMode) return 'rgba(192, 57, 43, 1)';
+                        if (planningMode) return 'rgba(220, 80, 80, 1)';
                         var index = context.dataIndex;
                         var time = parseFloat(timePoints[index]);
-                        return Math.abs(time - currentTimeHours) < 0.2 ? '#fff' : 'rgba(192, 57, 43, 1)';
+                        return Math.abs(time - currentTimeHours) < 0.2 ? '#c0c0e0' : 'rgba(220, 80, 80, 1)';
                     },
                     pointBorderWidth: function(context) {
                         if (planningMode) return 1;
@@ -662,6 +673,11 @@
                         plugins: {
                             legend: { display: false },
                             tooltip: {
+                                backgroundColor: '#1e1e2e',
+                                titleColor: '#c0c0e0',
+                                bodyColor: '#a0a0c0',
+                                borderColor: '#2e2e4e',
+                                borderWidth: 1,
                                 callbacks: {
                                     label: function(context) {
                                         return 'BAC: ' + context.parsed.y.toFixed(3) + '%';
@@ -677,22 +693,27 @@
                                 title: {
                                     display: true,
                                     text: planningMode ? 'Time (hours from now)' : 'Time Since First Drink (hours)',
-                                    font: { size: 13, weight: 'bold' }
+                                    font: { size: 13, weight: 'bold' },
+                                    color: '#a0a0c0'
                                 },
-                                ticks: { maxTicksLimit: 10 }
+                                ticks: { maxTicksLimit: 10, color: '#7a7a9a' },
+                                grid: { color: 'rgba(255,255,255,0.05)' }
                             },
                             y: {
                                 title: {
                                     display: true,
                                     text: 'Blood Alcohol Content (%)',
-                                    font: { size: 13, weight: 'bold' }
+                                    font: { size: 13, weight: 'bold' },
+                                    color: '#a0a0c0'
                                 },
                                 beginAtZero: true,
                                 ticks: {
                                     callback: function(value) {
                                         return value.toFixed(2) + '%';
-                                    }
-                                }
+                                    },
+                                    color: '#7a7a9a'
+                                },
+                                grid: { color: 'rgba(255,255,255,0.05)' }
                             }
                         }
                     }
