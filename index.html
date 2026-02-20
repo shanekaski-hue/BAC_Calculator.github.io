@@ -451,6 +451,58 @@
             gap: 10px;
             margin-top: 10px;
         }
+        .drink-edit-panel {
+            background: #0e0e1e;
+            border: 1px solid #3d35a8;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        .drink-edit-panel label {
+            font-size: 11px;
+            color: #7a7a9a;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .drink-edit-panel input[type="datetime-local"] {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1a1a2e;
+            border: 1px solid #2e2e4e;
+            border-radius: 6px;
+            color: #e0e0f0;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .drink-edit-panel input[type="datetime-local"]:focus {
+            outline: none;
+            border-color: #5a4fcf;
+        }
+        .drink-edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .btn-edit-save {
+            flex: 1;
+            padding: 8px;
+            background: linear-gradient(135deg, #3d35a8, #5a4fcf);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-edit-cancel {
+            padding: 8px 14px;
+            background: #1a1a2e;
+            color: #a0a0c0;
+            border: 1px solid #2e2e4e;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
         .toast {
             position: fixed;
             bottom: 30px;
@@ -547,10 +599,15 @@
             </div>
 
             <div class="form-group" id="liveTimeGroup">
-                <label for="drinkingTime">Drinking Time (hours)</label>
-                <input type="number" id="drinkingTime" step="0.1" min="0.1" value="0.5">
-                <div class="hint">How long it takes to finish this drink</div>
+                <div id="drinkTimerDisplay" style="display:none; background:#12121f; border:2px solid #3d35a8; border-radius:10px; padding:14px; text-align:center; margin-bottom:10px;">
+                    <div style="font-size:13px; color:#a0a0c0; margin-bottom:6px;">⏱ Drinking in progress…</div>
+                    <div id="drinkTimerClock" style="font-size:28px; font-weight:700; color:#7b72e9; font-variant-numeric: tabular-nums;">0:00</div>
+                </div>
+                <input type="hidden" id="drinkingTime" value="0.5">
             </div>
+
+            <button class="btn btn-add" id="startDrinkBtn" style="background: linear-gradient(135deg, #1a6b3a 0%, #27a356 100%); display:none;">▶ Start Drinking</button>
+            <button class="btn" id="finishDrinkBtn" style="background: linear-gradient(135deg, #b8860b 0%, #d4a017 100%); display:none;">✅ Drink Finished</button>
 
             <div class="form-group" id="planTimeGroup" style="display: none;">
                 <label>Drinking Schedule</label>
@@ -569,6 +626,7 @@
 
             <button class="btn btn-add" id="addBtn">Add Drink</button>
             <input type="hidden" id="editIndex" value="-1">
+            <input type="hidden" id="drinkStartedAt" value="">
         </div>
 
         <div class="results" id="results">
@@ -656,13 +714,24 @@
             var updateInterval = null;
             var planningMode = false;
             
+            // Initialize live mode button state (live mode is default)
+            // Will be set properly once DOM refs are established below
+            
             var liveBtn = document.getElementById('liveBtn');
             var planBtn = document.getElementById('planBtn');
             var planningInfo = document.getElementById('planningInfo');
             var liveTimeGroup = document.getElementById('liveTimeGroup');
             var planTimeGroup = document.getElementById('planTimeGroup');
             var addBtn = document.getElementById('addBtn');
+            var startDrinkBtn = document.getElementById('startDrinkBtn');
+            var finishDrinkBtn = document.getElementById('finishDrinkBtn');
             var resetBtn = document.getElementById('resetBtn');
+            var drinkTimerInterval = null;
+
+            // Initial button state: live mode is default
+            addBtn.style.display = 'none';
+            startDrinkBtn.style.display = 'block';
+            finishDrinkBtn.style.display = 'none';
             
             // Mode toggle
             liveBtn.onclick = function() {
@@ -672,6 +741,9 @@
                 planningInfo.style.display = 'none';
                 liveTimeGroup.style.display = 'block';
                 planTimeGroup.style.display = 'none';
+                addBtn.style.display = 'none';
+                startDrinkBtn.style.display = 'block';
+                finishDrinkBtn.style.display = 'none';
                 document.getElementById('bacLabel').textContent = 'Current Blood Alcohol Content';
                 document.getElementById('effectsTitle').textContent = 'Expected Effects at Current BAC';
                 autosaveState();
@@ -684,6 +756,13 @@
                 planningInfo.style.display = 'block';
                 liveTimeGroup.style.display = 'none';
                 planTimeGroup.style.display = 'block';
+                addBtn.style.display = 'block';
+                startDrinkBtn.style.display = 'none';
+                finishDrinkBtn.style.display = 'none';
+                // Stop timer if running
+                if (drinkTimerInterval) { clearInterval(drinkTimerInterval); drinkTimerInterval = null; }
+                document.getElementById('drinkTimerDisplay').style.display = 'none';
+                document.getElementById('drinkStartedAt').value = '';
                 document.getElementById('bacLabel').textContent = 'Predicted BAC Timeline';
                 document.getElementById('effectsTitle').textContent = 'Peak Effects';
                 autosaveState();
@@ -764,6 +843,14 @@
                 return h + 'h ' + m + 'm';
             }
             
+            function toDatetimeLocal(ts) {
+                // Convert a timestamp (ms) to a datetime-local string in local time
+                var d = new Date(ts);
+                var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+                return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+                       'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            }
+
             function updateDrinksList() {
                 var listEl = document.getElementById('drinksList');
                 if (drinks.length === 0) {
@@ -781,23 +868,37 @@
                         timeText = formatTime(drink.startTime) + ' → ' + formatTime(drink.endTime);
                         itemClass += ' planned';
                     } else {
-                        timeText = getTimeSince(drink.timestamp);
+                        // Show start → end times if available, else just "added X ago"
+                        if (drink.timestamp && drink.finishedAt) {
+                            var startD = new Date(drink.timestamp);
+                            var endD = new Date(drink.finishedAt);
+                            var fmt = function(d) {
+                                var h = d.getHours(), m = d.getMinutes();
+                                var ampm = h >= 12 ? 'pm' : 'am';
+                                h = h % 12 || 12;
+                                return h + ':' + (m < 10 ? '0' : '') + m + ampm;
+                            };
+                            timeText = fmt(startD) + ' → ' + fmt(endD);
+                        } else {
+                            timeText = getTimeSince(drink.timestamp);
+                        }
                     }
                     
-                    html += '<div class="' + itemClass + '">' +
+                    html += '<div class="' + itemClass + '" id="drink-row-' + i + '">' +
                         '<div class="drink-info">' +
                             '<div class="drink-name">' + drink.name + '</div>' +
                             '<div class="drink-details">' + 
                                 Math.round(drink.volume) + 'ml • ' + drink.alcohol + '% • ' + 
-                                (drink.drinkingTime || (drink.endTime - drink.startTime)).toFixed(1) + 'h drinking time' +
+                                (drink.drinkingTime || (drink.endTime - drink.startTime)).toFixed(2) + 'h drinking time' +
                             '</div>' +
                             '<div class="drink-time">' + timeText + '</div>' +
                         '</div>' +
                         '<div class="drink-actions">' +
-                            (planningMode ? '<button class="edit-btn" data-index="' + i + '">Edit</button>' : '') +
+                            '<button class="edit-btn" data-index="' + i + '">Edit</button>' +
                             '<button class="remove-btn" data-index="' + i + '">Remove</button>' +
                         '</div>' +
-                    '</div>';
+                    '</div>' +
+                    '<div id="drink-edit-' + i + '" style="display:none; margin: -8px 0 10px 0;"></div>';
                 }
                 listEl.innerHTML = html;
                 
@@ -806,7 +907,11 @@
                 for (var i = 0; i < editBtns.length; i++) {
                     editBtns[i].onclick = function() {
                         var index = parseInt(this.getAttribute('data-index'));
-                        editDrink(index);
+                        if (planningMode) {
+                            editDrink(index);
+                        } else {
+                            toggleLiveEditPanel(index);
+                        }
                     };
                 }
                 
@@ -830,6 +935,93 @@
                         }
                     };
                 }
+            }
+
+            function toggleLiveEditPanel(index) {
+                var panelEl = document.getElementById('drink-edit-' + index);
+                if (!panelEl) return;
+
+                // Toggle: if already open, close it
+                if (panelEl.style.display !== 'none') {
+                    panelEl.style.display = 'none';
+                    panelEl.innerHTML = '';
+                    return;
+                }
+
+                // Close any other open panels
+                var allPanels = document.querySelectorAll('[id^="drink-edit-"]');
+                for (var j = 0; j < allPanels.length; j++) {
+                    allPanels[j].style.display = 'none';
+                    allPanels[j].innerHTML = '';
+                }
+
+                var drink = drinks[index];
+                var startVal = drink.timestamp ? toDatetimeLocal(drink.timestamp) : toDatetimeLocal(Date.now());
+                var endVal = drink.finishedAt ? toDatetimeLocal(drink.finishedAt) :
+                             (drink.timestamp ? toDatetimeLocal(drink.timestamp + drink.drinkingTime * 3600000) : toDatetimeLocal(Date.now()));
+
+                panelEl.innerHTML =
+                    '<div class="drink-edit-panel">' +
+                        '<div style="font-size:12px;color:#7b72e9;font-weight:600;margin-bottom:8px;">✏️ Adjust Timing</div>' +
+                        '<label>Started drinking</label>' +
+                        '<input type="datetime-local" id="edit-start-' + index + '" value="' + startVal + '">' +
+                        '<label>Finished drinking</label>' +
+                        '<input type="datetime-local" id="edit-end-' + index + '" value="' + endVal + '">' +
+                        '<div class="drink-edit-actions">' +
+                            '<button class="btn-edit-save" data-save-index="' + index + '">Save Changes</button>' +
+                            '<button class="btn-edit-cancel" data-cancel-index="' + index + '">Cancel</button>' +
+                        '</div>' +
+                    '</div>';
+
+                panelEl.style.display = 'block';
+
+                // Bind save
+                panelEl.querySelector('[data-save-index]').onclick = function() {
+                    var idx = parseInt(this.getAttribute('data-save-index'));
+                    saveLiveDrinkTiming(idx);
+                };
+                // Bind cancel
+                panelEl.querySelector('[data-cancel-index]').onclick = function() {
+                    var idx = parseInt(this.getAttribute('data-cancel-index'));
+                    var p = document.getElementById('drink-edit-' + idx);
+                    if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+                };
+            }
+
+            function saveLiveDrinkTiming(index) {
+                var startInput = document.getElementById('edit-start-' + index);
+                var endInput = document.getElementById('edit-end-' + index);
+                if (!startInput || !endInput) return;
+
+                var startTs = new Date(startInput.value).getTime();
+                var endTs = new Date(endInput.value).getTime();
+
+                if (isNaN(startTs) || isNaN(endTs)) {
+                    alert('Please enter valid start and end times.');
+                    return;
+                }
+                if (endTs <= startTs) {
+                    alert('Finish time must be after start time.');
+                    return;
+                }
+
+                drinks[index].timestamp = startTs;
+                drinks[index].finishedAt = endTs;
+                drinks[index].drinkingTime = (endTs - startTs) / 3600000;
+
+                // Update session start if this was the first drink
+                if (index === 0 || startTs < sessionStartTime) {
+                    sessionStartTime = startTs;
+                }
+
+                // Close panel & refresh
+                var panelEl = document.getElementById('drink-edit-' + index);
+                if (panelEl) { panelEl.style.display = 'none'; panelEl.innerHTML = ''; }
+
+                updateDrinksList();
+                calculateBAC();
+                autosaveState();
+                showToast('✓ Timing updated', '#3d35a8');
             }
             
             function editDrink(index) {
@@ -977,7 +1169,7 @@
                 var eliminationRate = 0.015;
                 
                 var currentTimeHours = 0;
-                var maxTime = 12;
+                var maxTime = 24;
                 
                 if (planningMode) {
                     // Find latest end time
@@ -987,7 +1179,7 @@
                 } else {
                     var now = Date.now();
                     currentTimeHours = (now - sessionStartTime) / 1000 / 60 / 60;
-                    maxTime = Math.max(12, currentTimeHours + 8);
+                    maxTime = Math.max(24, currentTimeHours + 8);
                 }
                 
                 var timePoints = [];
@@ -1119,7 +1311,7 @@
                 updateDrinksList();
             }
             
-            // Add/Update drink handler
+            // Add/Update drink handler (Plan Mode only)
             if (addBtn) {
                 addBtn.onclick = function() {
                     try {
@@ -1152,38 +1344,21 @@
                             drinkData.volume = volume * 29.5735;
                         }
                         
-                        if (planningMode) {
-                            var startTime = parseFloat(document.getElementById('startTime').value);
-                            var endTime = parseFloat(document.getElementById('endTime').value);
-                            
-                            if (isNaN(startTime) || isNaN(endTime)) {
-                                alert('Please fill in start and end times!');
-                                return false;
-                            }
-                            
-                            if (endTime <= startTime) {
-                                alert('End time must be after start time!');
-                                return false;
-                            }
-                            
-                            drinkData.startTime = startTime;
-                            drinkData.endTime = endTime;
-                        } else {
-                            var drinkingTime = parseFloat(document.getElementById('drinkingTime').value);
-                            
-                            if (!drinkingTime) {
-                                alert('Please fill in drinking time!');
-                                return false;
-                            }
-                            
-                            drinkData.drinkingTime = drinkingTime;
-                            drinkData.timestamp = Date.now();
-                            
-                            // Initialize session if first drink
-                            if (drinks.length === 0 && editIndex === -1) {
-                                sessionStartTime = Date.now();
-                            }
+                        var startTime = parseFloat(document.getElementById('startTime').value);
+                        var endTime = parseFloat(document.getElementById('endTime').value);
+                        
+                        if (isNaN(startTime) || isNaN(endTime)) {
+                            alert('Please fill in start and end times!');
+                            return false;
                         }
+                        
+                        if (endTime <= startTime) {
+                            alert('End time must be after start time!');
+                            return false;
+                        }
+                        
+                        drinkData.startTime = startTime;
+                        drinkData.endTime = endTime;
                         
                         // Update or add drink
                         if (editIndex >= 0) {
@@ -1197,30 +1372,18 @@
                         // Clear form
                         document.getElementById('alcohol').value = '';
                         document.getElementById('volume').value = '';
-                        if (planningMode) {
-                            var lastEndTime = 0;
-                            for (var i = 0; i < drinks.length; i++) {
-                                lastEndTime = Math.max(lastEndTime, drinks[i].endTime);
-                            }
-                            document.getElementById('startTime').value = lastEndTime;
-                            document.getElementById('endTime').value = (lastEndTime + 0.5).toFixed(2);
-                        } else {
-                            document.getElementById('drinkingTime').value = '0.5';
+                        var lastEndTime = 0;
+                        for (var i = 0; i < drinks.length; i++) {
+                            lastEndTime = Math.max(lastEndTime, drinks[i].endTime);
                         }
+                        document.getElementById('startTime').value = lastEndTime;
+                        document.getElementById('endTime').value = (lastEndTime + 0.5).toFixed(2);
                         document.getElementById('preset').value = '';
                         
                         // Calculate and show results
                         calculateBAC();
                         autosaveState();
                         document.getElementById('results').className = 'results show';
-                        
-                        // Start auto-update in live mode
-                        if (!planningMode && !updateInterval) {
-                            updateInterval = setInterval(function() {
-                                calculateBAC();
-                                autosaveState();
-                            }, 60000);
-                        }
                         
                         // Scroll to results
                         setTimeout(function() {
@@ -1235,6 +1398,131 @@
                     }
                     
                     return false;
+                };
+            }
+
+            // ── Live mode: Start Drinking button ──────────────────────────
+            if (startDrinkBtn) {
+                startDrinkBtn.onclick = function() {
+                    var alcohol = parseFloat(document.getElementById('alcohol').value);
+                    var volume = parseFloat(document.getElementById('volume').value);
+                    var weight = parseFloat(document.getElementById('weight').value);
+                    var gender = document.getElementById('gender').value;
+
+                    if (!weight || !gender) {
+                        alert('Please enter your weight and select your gender first!');
+                        return;
+                    }
+                    if (!alcohol || !volume) {
+                        alert('Please fill in alcohol percentage and volume first!');
+                        return;
+                    }
+
+                    // Record start time
+                    document.getElementById('drinkStartedAt').value = Date.now();
+                    document.getElementById('drinkTimerDisplay').style.display = 'block';
+                    startDrinkBtn.style.display = 'none';
+                    finishDrinkBtn.style.display = 'block';
+
+                    // Start clock ticker
+                    if (drinkTimerInterval) clearInterval(drinkTimerInterval);
+                    drinkTimerInterval = setInterval(function() {
+                        var started = parseInt(document.getElementById('drinkStartedAt').value);
+                        if (!started) return;
+                        var elapsed = Math.floor((Date.now() - started) / 1000);
+                        var mins = Math.floor(elapsed / 60);
+                        var secs = elapsed % 60;
+                        document.getElementById('drinkTimerClock').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+                    }, 1000);
+                };
+            }
+
+            // ── Live mode: Drink Finished button ──────────────────────────
+            if (finishDrinkBtn) {
+                finishDrinkBtn.onclick = function() {
+                    try {
+                        var weight = parseFloat(document.getElementById('weight').value);
+                        var gender = document.getElementById('gender').value;
+                        var alcohol = parseFloat(document.getElementById('alcohol').value);
+                        var volume = parseFloat(document.getElementById('volume').value);
+                        var started = parseInt(document.getElementById('drinkStartedAt').value);
+
+                        if (!weight || !gender) {
+                            alert('Please enter your weight and select your gender first!');
+                            return;
+                        }
+                        if (!alcohol || !volume) {
+                            alert('Please fill in alcohol percentage and volume!');
+                            return;
+                        }
+                        if (!started) {
+                            alert('Please press "Start Drinking" first!');
+                            return;
+                        }
+
+                        // Calculate elapsed drinking time in hours
+                        var elapsedMs = Date.now() - started;
+                        var drinkingTime = Math.max(elapsedMs / 1000 / 3600, 1/60); // minimum 1 min
+
+                        var drinkData = {
+                            alcohol: alcohol,
+                            volume: volume,
+                            name: getDrinkName(alcohol, volume),
+                            drinkingTime: drinkingTime,
+                            timestamp: started,
+                            finishedAt: Date.now()
+                        };
+
+                        // Convert volume to ml if in oz
+                        var volumeUnit = document.getElementById('volumeUnit').value;
+                        if (volumeUnit === 'oz') {
+                            drinkData.volume = volume * 29.5735;
+                        }
+
+                        // Initialize session start if first drink
+                        if (drinks.length === 0) {
+                            sessionStartTime = started;
+                        }
+
+                        drinks.push(drinkData);
+
+                        // Stop timer
+                        if (drinkTimerInterval) { clearInterval(drinkTimerInterval); drinkTimerInterval = null; }
+                        document.getElementById('drinkTimerDisplay').style.display = 'none';
+                        document.getElementById('drinkTimerClock').textContent = '0:00';
+                        document.getElementById('drinkStartedAt').value = '';
+
+                        // Reset UI
+                        finishDrinkBtn.style.display = 'none';
+                        startDrinkBtn.style.display = 'block';
+                        document.getElementById('alcohol').value = '';
+                        document.getElementById('volume').value = '';
+                        document.getElementById('preset').value = '';
+
+                        // Calculate and show results
+                        calculateBAC();
+                        autosaveState();
+                        document.getElementById('results').className = 'results show';
+
+                        // Start auto-update interval
+                        if (!updateInterval) {
+                            updateInterval = setInterval(function() {
+                                calculateBAC();
+                                autosaveState();
+                            }, 60000);
+                        }
+
+                        // Scroll to results
+                        setTimeout(function() {
+                            document.getElementById('results').scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'nearest' 
+                            });
+                        }, 100);
+
+                    } catch (err) {
+                        alert('Error finishing drink: ' + err.message);
+                    }
                 };
             }
             
@@ -1258,6 +1546,16 @@
                         document.getElementById('timestampedNoteInput').value = '';
                         renderTimestampedNotes();
                         addBtn.textContent = 'Add Drink';
+
+                        // Reset timer state
+                        if (drinkTimerInterval) { clearInterval(drinkTimerInterval); drinkTimerInterval = null; }
+                        document.getElementById('drinkTimerDisplay').style.display = 'none';
+                        document.getElementById('drinkTimerClock').textContent = '0:00';
+                        document.getElementById('drinkStartedAt').value = '';
+                        if (!planningMode) {
+                            startDrinkBtn.style.display = 'block';
+                            finishDrinkBtn.style.display = 'none';
+                        }
                         
                         if (updateInterval) {
                             clearInterval(updateInterval);
@@ -1720,8 +2018,15 @@
                         planningInfo.style.display = 'block';
                         liveTimeGroup.style.display = 'none';
                         planTimeGroup.style.display = 'block';
+                        addBtn.style.display = 'block';
+                        startDrinkBtn.style.display = 'none';
+                        finishDrinkBtn.style.display = 'none';
                         document.getElementById('bacLabel').textContent = 'Predicted BAC Timeline';
                         document.getElementById('effectsTitle').textContent = 'Peak Effects';
+                    } else {
+                        addBtn.style.display = 'none';
+                        startDrinkBtn.style.display = 'block';
+                        finishDrinkBtn.style.display = 'none';
                     }
 
                     // Rebuild UI
