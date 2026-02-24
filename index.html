@@ -1639,14 +1639,37 @@
             }
 
             // ── window.storage helpers (persistent across sessions) ────
+            // ── Storage helpers with localStorage fallback ─────────────
+            async function storageGet(key) {
+                // Try window.storage first
+                try {
+                    if (window.storage) {
+                        var r = await window.storage.get(key);
+                        if (r && r.value) return r.value;
+                    }
+                } catch(e) {}
+                // Fallback to localStorage
+                try { return localStorage.getItem(key); } catch(e) {}
+                return null;
+            }
+            async function storageSet(key, value) {
+                // Write to both for maximum durability
+                try { if (window.storage) await window.storage.set(key, value); } catch(e) {}
+                try { localStorage.setItem(key, value); } catch(e) {}
+            }
+            async function storageDelete(key) {
+                try { if (window.storage) await window.storage.delete(key); } catch(e) {}
+                try { localStorage.removeItem(key); } catch(e) {}
+            }
+
             async function getSessions() {
                 try {
-                    var result = await window.storage.get('bac_sessions');
-                    return result ? JSON.parse(result.value) : [];
+                    var val = await storageGet('bac_sessions');
+                    return val ? JSON.parse(val) : [];
                 } catch(e) { return []; }
             }
             async function saveSessions(arr) {
-                try { await window.storage.set('bac_sessions', JSON.stringify(arr)); } catch(e) {}
+                await storageSet('bac_sessions', JSON.stringify(arr));
             }
 
             // ── Render history list ────────────────────────────────────
@@ -1985,19 +2008,19 @@
                         generalNote: document.getElementById('sessionNote') ? document.getElementById('sessionNote').value : '',
                         savedAt: Date.now()
                     };
-                    await window.storage.set(AUTOSAVE_KEY, JSON.stringify(state));
+                    await storageSet(AUTOSAVE_KEY, JSON.stringify(state));
                 } catch(e) {}
             }
 
             async function clearAutosave() {
-                try { await window.storage.delete(AUTOSAVE_KEY); } catch(e) {}
+                await storageDelete(AUTOSAVE_KEY);
             }
 
             async function restoreState() {
                 try {
-                    var result = await window.storage.get(AUTOSAVE_KEY);
-                    if (!result) return;
-                    var state = JSON.parse(result.value);
+                    var raw = await storageGet(AUTOSAVE_KEY);
+                    if (!raw) return;
+                    var state = JSON.parse(raw);
                     if (!state || !state.drinks || state.drinks.length === 0) return;
 
                     // Restore data
